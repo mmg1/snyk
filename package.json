@@ -1,5 +1,6 @@
 {
   "name": "snyk",
+  "version": "1.436.0",
   "description": "snyk library and cli utility",
   "main": "dist/lib/index.js",
   "files": [
@@ -22,8 +23,12 @@
   "engines": {
     "node": ">=8"
   },
+  "workspaces": [
+    ".",
+    "packages/*"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --build tsconfig.json",
     "build-watch": "tsc -w",
     "find-circular": "npm run build && madge --circular ./dist",
     "format": "prettier --write '{src,test,scripts}/**/*.{js,ts}'",
@@ -149,5 +154,9 @@
       "help/**/*.txt",
       "dist/STANDALONE"
     ]
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
   }
 }
