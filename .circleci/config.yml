@@ -115,6 +115,31 @@ commands:
       - run:
           name: Run CLI help text builder
           command: npm run generate-help
+  install_github_cli:
+    description: Install GitHub CLI (gh)
+    steps:
+      - run:
+          name: Install GitHub CLI (gh)
+          command: |
+            mkdir gh-download
+            curl -Lo ./gh-download/gh_1.3.1_linux_amd64.tar.gz https://github.com/cli/cli/releases/download/v1.3.1/gh_1.3.1_linux_amd64.tar.gz
+            tar -xf ./gh-download/gh_1.3.1_linux_amd64.tar.gz --directory gh-download
+            chmod a+x gh-download/gh_1.3.1_linux_amd64/bin/gh
+            mkdir -p /home/circleci/bin
+            mv gh-download/gh_1.3.1_linux_amd64/bin/gh /home/circleci/bin
+            which gh
+            gh --version
+  configure_git_credentials:
+    description: Configure Git Credentials
+    steps:
+      - run:
+          name: Configure Git Credentials
+          command: |
+            git config --global user.email "$GH_USER_EMAIL"
+            git config --global user.name "$GH_USER"
+            echo -e "$GPG_KEY" | gpg --import
+            git config --global commit.gpgsign true
+            git config --global user.signingkey $GPG_ID
 
 jobs:
   regression-test:
@@ -234,104 +259,167 @@ jobs:
           name: Publish to GitHub
           command: semantic-release
 
+  dev-release:
+    <<: *defaults
+    docker:
+      - image: circleci/node:<< parameters.node_version >>
+    resource_class: small
+    steps:
+      - checkout
+      # - add_ssh_keys
+      - setup_remote_docker:
+          version: 19.03.13
+      # - configure_git_credentials
+      - install_github_cli
+      - run:
+          name: Check npm version
+          command: |
+            npm --version
+            sudo npm install -g npm@7
+            npm --version
+      - run:
+          name: Install npm@7
+          command: |
+            sudo npm install -g npm@7
+      - show_node_version
+      - run:
+          name: Setup Lerna
+          command: sudo npm install -g lerna
+      - run:
+          name: npm install
+          command: |
+            npm install
+            ls -la
+            ls -la packages/cli-protect
+
+      # Pseudo because lerna doesn't have an actualy --dry run and --canary is not the same thing
+      # the `--skip-git` and `--skip-npm` options make it pseudo `--dry-run`
+      - run:
+          name: Pseudo Lerna Publish
+          command: |
+            echo "skipping dev publish for now"
+
+            # use this to avoid even making a dev release for now
+            # lerna publish minor --skip-git --skip-npm --yes
+            
+            # use this when ready to start making dev releases:
+            # lerna publish preminor --force-publish --canary --yes
+
+      - run:
+          name: Create Binaries
+          command: |
+            ./release-scripts/make-binaries.sh
+            ls -la ./binary-releases
+
+      - store_artifacts:
+          path: ./binary-releases
+
 workflows:
   version: 2
   test_and_release:
     jobs:
-      - regression-test:
-          name: Regression Test
-          context: nodejs-install
-          node_version: '8'
-          filters:
-            branches:
-              ignore:
-                - master
-      - test-windows:
-          name: Windows Tests for Node v12 support
-          context: nodejs-install
-          node_version: '12.0.0'
-          requires:
-            - Regression Test
-          filters:
-            branches:
-              ignore:
-                - master
-      - test-windows:
-          name: Windows Tests for Node v14 support
-          context: nodejs-install
+      - dev-release:
+          name: Dev Release
           node_version: '14'
-          requires:
-            - Regression Test
-          filters:
-            branches:
-              ignore:
-                - master
-      - test-windows:
-          name: Windows Tests for Node v10 support
-          context: nodejs-install
-          node_version: '10.21.0'
-          requires:
-            - Regression Test
-          filters:
-            branches:
-              ignore:
-                - master
-      - test-windows:
-          name: Windows Tests for Node v8 support
-          context: nodejs-install
-          node_version: '8.17.0'
-          requires:
-            - Regression Test
-          filters:
-            branches:
-              ignore:
-                - master
-      - test-unix:
-          name: Unix Tests for Node v12 support
-          context: nodejs-install
-          node_version: '12.16.2'
-          requires:
-            - Regression Test
-          filters:
-            branches:
-              ignore:
-                - master
-      - test-unix:
-          name: Unix Tests for Node v14 support
-          context: nodejs-install
-          node_version: '14'
-          requires:
-            - Regression Test
-          filters:
-            branches:
-              ignore:
-                - master
-      - test-unix:
-          name: Unix Tests for Node v10 support
-          context: nodejs-install
-          node_version: '10'
-          requires:
-            - Regression Test
-          filters:
-            branches:
-              ignore:
-                - master
-      - test-unix:
-          name: Unix Tests for Node v8 support
-          context: nodejs-install
-          node_version: '8'
-          requires:
-            - Regression Test
           filters:
             branches:
               ignore:
                 - master
 
-      - release:
-          name: Release
-          context: nodejs-app-release
-          node_version: '14'
-          filters:
-            branches:
-              only:
-                - master
+      # - regression-test:
+      #     name: Regression Test
+      #     context: nodejs-install
+      #     node_version: '8'
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+      # - test-windows:
+      #     name: Windows Tests for Node v12 support
+      #     context: nodejs-install
+      #     node_version: '12.0.0'
+      #     requires:
+      #       - Regression Test
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+      # - test-windows:
+      #     name: Windows Tests for Node v14 support
+      #     context: nodejs-install
+      #     node_version: '14'
+      #     requires:
+      #       - Regression Test
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+      # - test-windows:
+      #     name: Windows Tests for Node v10 support
+      #     context: nodejs-install
+      #     node_version: '10.21.0'
+      #     requires:
+      #       - Regression Test
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+      # - test-windows:
+      #     name: Windows Tests for Node v8 support
+      #     context: nodejs-install
+      #     node_version: '8.17.0'
+      #     requires:
+      #       - Regression Test
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+      # - test-unix:
+      #     name: Unix Tests for Node v12 support
+      #     context: nodejs-install
+      #     node_version: '12.16.2'
+      #     requires:
+      #       - Regression Test
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+      # - test-unix:
+      #     name: Unix Tests for Node v14 support
+      #     context: nodejs-install
+      #     node_version: '14'
+      #     requires:
+      #       - Regression Test
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+      # - test-unix:
+      #     name: Unix Tests for Node v10 support
+      #     context: nodejs-install
+      #     node_version: '10'
+      #     requires:
+      #       - Regression Test
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+      # - test-unix:
+      #     name: Unix Tests for Node v8 support
+      #     context: nodejs-install
+      #     node_version: '8'
+      #     requires:
+      #       - Regression Test
+      #     filters:
+      #       branches:
+      #         ignore:
+      #           - master
+
+      # - release:
+      #     name: Release
+      #     context: nodejs-app-release
+      #     node_version: '14'
+      #     filters:
+      #       branches:
+      #         only:
+      #           - master

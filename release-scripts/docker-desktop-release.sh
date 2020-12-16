@@ -7,6 +7,8 @@ mkdir ./dist/docker/cli
 cp -r ./dist/cli ./dist/docker/cli/cli
 cp -r ./dist/lib ./dist/docker/cli/lib
 cp ./package.json ./dist/docker/
+# cp ./tsconfig.json ./dist/docker/
+# cp ./tsconfig.settings.json ./dist/docker/
 cp ./config.default.json ./dist/docker/
 cp -r ./help ./dist/docker/help
 
@@ -15,7 +17,7 @@ cp ./release-scripts/snyk-mac.sh ./dist/docker/
 
 cd ./dist/docker
 
-npm install --production
+npx npm@6 --yes --ignore-scripts install --production
 rm -rf package-lock.json
 
 # Download macOS NodeJS binary, using same as pkg
@@ -27,8 +29,8 @@ cd ..
 tar czfh docker-mac-signed-bundle.tar.gz ./docker
 # final package must be at root, otherwise it gets included in /dist folder
 cd ..
-mv ./dist/docker-mac-signed-bundle.tar.gz .
+mv ./dist/docker-mac-signed-bundle.tar.gz ./binary-releases
 
-sha256sum docker-mac-signed-bundle.tar.gz > docker-mac-signed-bundle.tar.gz.sha256
+shasum -a 256 binary-releases/docker-mac-signed-bundle.tar.gz > binary-releases/docker-mac-signed-bundle.tar.gz.sha256
 
 rm -rf ./dist/docker
