@@ -74,10 +74,10 @@ async function sendSlackAlert() {
   console.log('Slack alert sent.');
 }
 
-async function waitForConclusion(runID: number): Promise<boolean> {
+async function waitForConclusion(runID: number) {
   let status = 'queued';
   const before = Date.now();
-  console.log('Re-run in progress...');
+  console.log('Waiting for Smoke Test to finish running...');
 
   // Wait for run to finish
   while (status !== 'completed') {
@@ -101,7 +101,10 @@ async function waitForConclusion(runID: number): Promise<boolean> {
       }`,
     );
   }
+  console.log('Finished run.');
+}
 
+async function checkJobConclusion(runID: number): Promise<boolean> {
   // Get conclusions of the jobs that failed before
   const smokeTetsJobs = (
     await octokit.actions.listJobsForWorkflowRun({
@@ -117,11 +120,13 @@ async function waitForConclusion(runID: number): Promise<boolean> {
     failedJobs.includes(job.name),
   );
   for (const job of rerunJobs) {
-    if (job.conclusion === 'failure') {
-      return false;
+    if (job.conclusion !== 'failure') {
+      // Remove succeeding jobs from failedJobs
+      failedJobs.splice(failedJobs.indexOf(job.name), 1);
     }
   }
-  return true;
+  // Return true if array is empty, meaning all jobs succeeded after re-run
+  return failedJobs.length === 0;
 }
 
 async function run() {
@@ -167,15 +172,35 @@ async function run() {
     }
 
     console.log('Trying to re-run smoke test...');
+    const id = latestSmokeTests[0].id;
+
+    // Check current status of smoke test and wait if it's still running
+    const smokeTest = (
+      await octokit.actions.getWorkflowRun({
+        owner: 'snyk',
+        repo: 'snyk',
+        // eslint-disable-next-line @typescript-eslint/camelcase
+        run_id: id,
+      })
+    ).data;
+
+    if (smokeTest.status !== 'completed') {
+      console.log('First wait for current run to finish...');
+      await waitForConclusion(id);
+    }
+
+    // After making sure smoke test isn't currently running - try to re-run
+    console.log(`Starting re-run of Smoke Test. ID number: ${id}...`);
     await octokit.actions.reRunWorkflow({
       owner: 'snyk',
       repo: 'snyk',
       // eslint-disable-next-line @typescript-eslint/camelcase
-      run_id: latestSmokeTests[0].id,
+      run_id: id,
     });
 
     // Wait for run to finish
-    const succeeded = await waitForConclusion(latestSmokeTests[0].id);
+    await waitForConclusion(id);
+    const succeeded = await checkJobConclusion(id);
     console.log('Re-run completed.');
 
     // If run failed again, send Slack alert
