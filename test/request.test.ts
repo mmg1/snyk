@@ -51,7 +51,7 @@ test('request calls needle as expected and returns status code and body', (t) =>
             follow_max: 5, // default
             timeout: 300000, // default
             json: undefined, // default
-            agent: new https.Agent({ keepAlive: true }), // should not be set when not using proxy
+            agent: sinon.match.instanceOf(http.Agent),
             rejectUnauthorized: undefined, // should not be set when not use insecure mode
           }),
           sinon.match.func, // callback function
@@ -88,7 +88,7 @@ test('request to localhost calls needle as expected', (t) => {
             follow_max: 5, // default
             timeout: 300000, // default
             json: undefined, // default
-            agent: new http.Agent({ keepAlive: true }),
+            agent: sinon.match.instanceOf(http.Agent),
             rejectUnauthorized: undefined, // should not be set when not use insecure mode
           }),
           sinon.match.func, // callback function
@@ -126,7 +126,7 @@ test('request with timeout calls needle as expected', (t) => {
             follow_max: 5, // default
             timeout: 100000, // provided
             json: undefined, // default
-            agent: new http.Agent({ keepAlive: true }),
+            agent: sinon.match.instanceOf(http.Agent),
             rejectUnauthorized: undefined, // should not be set when not use insecure mode
           }),
           sinon.match.func, // callback function
@@ -167,7 +167,7 @@ test('request with query string calls needle as expected', (t) => {
             follow_max: 5, // default
             timeout: 300000, // default
             json: undefined, // default
-            agent: new https.Agent({ keepAlive: true }),
+            agent: sinon.match.instanceOf(http.Agent),
             rejectUnauthorized: undefined, // should not be set when not use insecure mode
           }),
           sinon.match.func, // callback function
@@ -205,7 +205,7 @@ test('request with json calls needle as expected', (t) => {
             follow_max: 5, // default
             timeout: 300000, // default
             json: false, // provided
-            agent: new https.Agent({ keepAlive: true }),
+            agent: sinon.match.instanceOf(http.Agent),
             rejectUnauthorized: undefined, // should not be set when not use insecure mode
           }),
           sinon.match.func, // callback function
@@ -246,7 +246,7 @@ test('request with custom header calls needle as expected', (t) => {
             follow_max: 5, // default
             timeout: 300000, // default
             json: undefined, // default
-            agent: new https.Agent({ keepAlive: true }),
+            agent: sinon.match.instanceOf(http.Agent),
             rejectUnauthorized: undefined, // should not be set when not use insecure mode
           }),
           sinon.match.func, // callback function
@@ -379,7 +379,7 @@ test('request with no proxy calls needle as expected', (t) => {
             follow_max: 5, // default
             timeout: 300000, // default
             json: undefined, // default
-            agent: new https.Agent({ keepAlive: true }),
+            agent: sinon.match.instanceOf(http.Agent),
             rejectUnauthorized: undefined, // should not be set when not use insecure mode
           }),
           sinon.match.func, // callback function
@@ -417,7 +417,7 @@ test('request with insecure calls needle as expected', (t) => {
             follow_max: 5, // default
             timeout: 300000, // default
             json: undefined, // default
-            agent: new https.Agent({ keepAlive: true }),
+            agent: sinon.match.instanceOf(http.Agent),
             rejectUnauthorized: false, // should be false when insecure mode enabled
           }),
           sinon.match.func, // callback function
