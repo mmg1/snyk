@@ -5,7 +5,7 @@ import * as querystring from 'querystring';
 import * as zlib from 'zlib';
 import * as config from '../config';
 import { getProxyForUrl } from 'proxy-from-env';
-import * as ProxyAgent from 'proxy-agent';
+import proxyAgent = require('http-proxy-agent');
 import * as analytics from '../analytics';
 import { Global } from '../../cli/args';
 import { Payload } from './types';
@@ -112,7 +112,7 @@ export = function makeRequest(
         const proxyUri = getProxyForUrl(url);
         if (proxyUri) {
           snykDebug('using proxy:', proxyUri);
-          options.agent = (new ProxyAgent(proxyUri) as unknown) as http.Agent;
+          options.agent = new proxyAgent.HttpProxyAgent(proxyUri);
         } else {
           snykDebug('not using proxy');
         }
