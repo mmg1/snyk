@@ -10,15 +10,15 @@ if (!process.env.USER_GITHUB_TOKEN || !process.env.SLACK_WEBHOOK_URL) {
 const GITHUB_TOKEN = process.env.USER_GITHUB_TOKEN;
 const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
 
-// Map from job id to it's name and conclusion
-const failedJobs: string[] = [];
-
 const octokit = new Octokit({
   auth: GITHUB_TOKEN,
 });
 const slackWebhook = new IncomingWebhook(SLACK_WEBHOOK_URL);
 
-async function checkJobs(smokeTest1: number, smokeTest2: number) {
+async function checkJobs(
+  smokeTest1: number,
+  smokeTest2: number,
+): Promise<string[]> {
   // Get all jobs of the latest 2 smoke tests
   const jobs1 = (
     await octokit.actions.listJobsForWorkflowRun({
@@ -37,6 +37,8 @@ async function checkJobs(smokeTest1: number, smokeTest2: number) {
       run_id: smokeTest2,
     })
   ).data.jobs;
+
+  const failedJobs: string[] = [];
 
   // If the same job failed in both smoke tests, it has been failing for 2 hours now. Save job to re-run later.
   for (const jobName of jobs1.map((j) => j.name)) {
@@ -58,9 +60,11 @@ async function checkJobs(smokeTest1: number, smokeTest2: number) {
       failedJobs.push(jobName);
     }
   }
+
+  return failedJobs;
 }
 
-async function sendSlackAlert() {
+async function sendSlackAlert(failedJobs: string[]) {
   console.log('Jobs failed again. Sending Slack alert...');
   const args: IncomingWebhookDefaultArguments = {
     username: 'Hammer Alerts',
@@ -104,9 +108,12 @@ async function waitForConclusion(runID: number) {
   console.log('Finished run.');
 }
 
-async function checkJobConclusion(runID: number): Promise<boolean> {
+async function checkJobConclusion(
+  runID: number,
+  failedJobs: string[],
+): Promise<string[]> {
   // Get conclusions of the jobs that failed before
-  const smokeTetsJobs = (
+  const smokeTestsJobs = (
     await octokit.actions.listJobsForWorkflowRun({
       owner: 'snyk',
       repo: 'snyk',
@@ -116,17 +123,18 @@ async function checkJobConclusion(runID: number): Promise<boolean> {
   ).data.jobs;
 
   // Return false if jobs that failed before failed again
-  const rerunJobs = smokeTetsJobs.filter((job) =>
+  const rerunJobs = smokeTestsJobs.filter((job) =>
     failedJobs.includes(job.name),
   );
+
+  const failedAgain: string[] = [];
   for (const job of rerunJobs) {
-    if (job.conclusion !== 'failure') {
-      // Remove succeeding jobs from failedJobs
-      failedJobs.splice(failedJobs.indexOf(job.name), 1);
+    if (job.conclusion === 'failure') {
+      failedAgain.push(job.name);
     }
   }
-  // Return true if array is empty, meaning all jobs succeeded after re-run
-  return failedJobs.length === 0;
+
+  return failedAgain;
 }
 
 async function run() {
@@ -162,7 +170,10 @@ async function run() {
     const latestSmokeTests = smokeTests.workflow_runs.slice(0, 2);
 
     console.log('Checking smoke tests jobs...');
-    await checkJobs(latestSmokeTests[0].id, latestSmokeTests[1].id);
+    const failedJobs = await checkJobs(
+      latestSmokeTests[0].id,
+      latestSmokeTests[1].id,
+    );
 
     if (!failedJobs.length || failedJobs.length < 1) {
       console.log(
@@ -200,13 +211,13 @@ async function run() {
 
     // Wait for run to finish
     await waitForConclusion(id);
-    const succeeded = await checkJobConclusion(id);
+    const failedAgain = await checkJobConclusion(id, failedJobs);
     console.log('Re-run completed.');
 
     // If run failed again, send Slack alert
-    succeeded
-      ? console.log('Jobs succeeded after re-run. Do not alert.')
-      : await sendSlackAlert();
+    failedAgain.length > 0
+      ? await sendSlackAlert(failedAgain)
+      : console.log('Jobs succeeded after re-run. Do not alert.');
   } catch (error) {
     console.error(error);
     process.exit(1);
