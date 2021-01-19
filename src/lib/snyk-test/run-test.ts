@@ -232,7 +232,7 @@ async function sendAndParseResults(
   // In the future, we would probably want to introduce a RATE_LIMIT specific for IaC
 
   if (options.iac) {
-    const maxConcurrent = 25;
+    const maxConcurrent = 50;
     const queue = new Queue(maxConcurrent);
     const iacResults: Promise<TestResult>[] = [];
 
